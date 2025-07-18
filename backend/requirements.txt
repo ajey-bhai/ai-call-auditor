@@ -6,4 +6,5 @@ chromadb
 pypdf
 python-dotenv
 numpy
+indic-transliteration
 # force rebuild
