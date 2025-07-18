@@ -10,6 +10,7 @@ import json
 from pypdf import PdfReader
 from tempfile import NamedTemporaryFile
 import numpy as np
+from indic_transliteration.sanscript import transliterate, DEVANAGARI, ITRANS
 
 load_dotenv()
 import os
@@ -22,7 +23,11 @@ app = FastAPI()
 # Allow CORS for local frontend dev
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "*",  # for local dev
+        "https://ajey-bhai.github.io",
+        "https://ajey-bhai.github.io/ai-call-auditor-frontend",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -77,14 +82,18 @@ def transcribe_audio_whisper(audio_path):
             file=f,
             model="whisper-1",
             response_format="verbose_json",
-            timestamp_granularities=["segment"]
+            timestamp_granularities=["segment"],
+            language="hi"
         )
-    # Build sentence-level transcript with speaker diarization (stub: all 'Agent')
+    # Build sentence-level transcript with speaker diarization (alternate Agent/Customer)
     results = []
-    for seg in transcript.segments:
+    speakers = ["Agent", "Customer"]
+    for i, seg in enumerate(transcript.segments):
+        # Transliterate to Roman script
+        roman_text = transliterate(seg.text, DEVANAGARI, ITRANS)
         results.append({
-            "speaker": "Agent",  # Real diarization would require more logic
-            "text": seg.text,
+            "speaker": speakers[i % 2],
+            "text": roman_text,
             "start": seg.start,
             "end": seg.end
         })
@@ -147,9 +156,9 @@ def get_transcript(conv_id: str):
     conv_dir = os.path.join(UPLOAD_DIR, conv_id)
     path = os.path.join(conv_dir, "transcript.json")
     if not os.path.exists(path):
-        return JSONResponse([], status_code=404)
+        return JSONResponse({"transcript": []}, status_code=404)
     with open(path) as f:
-        return JSONResponse(json.load(f))
+        return JSONResponse({"transcript": json.load(f)})
 
 @app.get("/pitch/{conv_id}")
 def get_pitch(conv_id: str):
